@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 
 	"golang.org/x/sync/errgroup"
@@ -35,19 +33,15 @@ func New() *App {
 }
 
 func (a *App) Run() error{
-	wg := sync.WaitGroup{}
 	eg,ctx := errgroup.WithContext(a.ctx)
 
 	srv := &http.Server{
 		Addr: "localhost:8080",
 	}
 
-	wg.Add(1)
 	eg.Go(func() error {
-		wg.Done()
 		return srv.ListenAndServe()
 	})
-	wg.Wait()
 
 	c := make(chan os.Signal,1)
 	signal.Notify(c,a.sigs...)
@@ -57,10 +51,7 @@ func (a *App) Run() error{
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-c:
-				if err := srv.Shutdown(ctx); err != nil {
-					fmt.Printf("Failed to stop app %v.\n",err)
-					return err
-				}
+				return srv.Shutdown(ctx)
 			}
 		}
 	})
@@ -76,4 +67,5 @@ func main()  {
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
+	log.Print("Server Exited Properly!")
 }
