@@ -34,28 +34,18 @@ func New() *App {
 	}
 }
 
-func (a *App) Stop() error {
-	if a.cancel != nil {
-		a.cancel()
-	}
-	return nil
-}
-
-func serverHttp(ctx context.Context) error {
-	http.HandleFunc("/hello",func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("hello"))
-	})
-	return http.ListenAndServe("localhost:8080",nil)
-}
-
 func (a *App) Run() error{
 	wg := sync.WaitGroup{}
 	eg,ctx := errgroup.WithContext(a.ctx)
 
+	srv := &http.Server{
+		Addr: "localhost:8080",
+	}
+
 	wg.Add(1)
 	eg.Go(func() error {
 		wg.Done()
-		return serverHttp(ctx)
+		return srv.ListenAndServe()
 	})
 	wg.Wait()
 
@@ -67,13 +57,14 @@ func (a *App) Run() error{
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-c:
-				if err := a.Stop(); err != nil {
-					fmt.Printf("failed to stop app %v.\n",err)
+				if err := srv.Shutdown(ctx); err != nil {
+					fmt.Printf("Failed to stop app %v.\n",err)
 					return err
 				}
 			}
 		}
 	})
+	log.Print("Server started")
 	if err := eg.Wait(); err != nil && errors.Is(err,context.Canceled) {
 		return err
 	}
